@@ -1,0 +1,149 @@
+
+Sample =100000;
+single_fre =200;
+num1 = Sample / single_fre;
+n=20;    % 光谱平均次数 5-->10
+
+
+
+%%%%滤波
+Fs = 1 / Sample;    
+Fc = Fs/20;                   % 截止频率为1/100-> 1/40 采样频率%
+[b, d] = butter(4, Fc/(Fs/2), 'low');   % 4 阶
+a = filtfilt(b, d, a);   % filtfilt 避免相位延迟
+
+b=a;
+
+%检查 
+if length(a) < num1
+    absorbance_spectrum_out = NaN;
+    peak_absorbance_out = NaN; % 同时将峰值输出也设为NaN
+    return;
+end
+
+%处理算法 
+num2 = floor(length(a) / num1);
+if num2 == 0
+    absorbance_spectrum_out = NaN;
+    peak_absorbance_out = NaN;
+    return;
+end
+
+start_index = length(a) - num1 * num2 + 1;
+end_index = length(a);
+
+
+
+signal_reshaped = reshape(a(start_index : end_index), num1.*(num2./n), []);
+signal_reshaped1=(signal_reshaped)'
+alpa=[];
+for i=1:1:n;
+
+    signal=reshape(signal_reshaped(:,i),num1,[])
+    
+    signal_averaged = mean(signal, 2);
+
+
+[~, index] = max(signal_averaged);
+single_cycle_doubled = [signal_averaged; signal_averaged];
+single_cycle_aligned = single_cycle_doubled(index : index + num1 - 1);
+
+single_cycle_aligned=single_cycle_aligned +4.2;%%抬高，交流变正数
+
+
+
+
+
+% 吸收度计算  0.2-->0.3, 0.9>0.99
+y = single_cycle_aligned(floor(0.3*num1) : floor(0.9*num1));
+y1=(single_cycle_aligned)'%y1没有参与计算
+% 吸收度计算 0.8-->0.95
+y2=(single_cycle_aligned(floor(0.3*num1): floor(0.9*num1),:))'
+%光强信号 P_light
+P_light=(y1(end)-y1(50))/2*100;
+
+y=(y2)';%y2参与计算
+
+y=y
+num3=size(y,1)
+%0.4->0.55, 0.4->0.24, 截取后拟合的数据7.22
+
+x = (1:length(y))';
+sta1 = 1;
+stp1 = floor(0.35* num3);
+sta2 = length(y)- floor(0.4 * num3);
+stp2 = length(y) ;
+xx = [x(sta1:stp1); x(sta2:stp2)];
+yy = [y(sta1:stp1); y(sta2:stp2)];
+pp = polyfit(xx, yy, 4);
+y0 = polyval(pp, x);
+y0y=([y0,y])';
+
+
+snr_ap=abs(y-y0);%修改
+%snr_ap=y0./y;
+snr_ap=(snr_ap)';
+
+% 1. 完整的吸收光谱 (矢量/数组)
+absorbance_spectrum_out = log(y0 ./ (y + eps));
+
+%-------------20260901%
+pp1=[-3.02716372873655e-09,5.82968569053455e-06,0.0241628513601265,0.609383083614659]'
+v = polyval(pp1,x);
+fsr=0.8761 %GHz     
+v0=0 %6534.365  %6534.365 %cm-1   中心频率
+[v_f index_f ]=max(absorbance_spectrum_out )
+v_f=(v-v(index_f)).*fsr./30 +v0  %最大值的位置为置为0，并偏置到峰中心高度处
+v_f=(v_f)'
+
+
+
+
+absorbance_spectrum_out =(absorbance_spectrum_out)';
+
+
+
+%%%%滤波
+%Fs = 1 / Sample;    
+%Fc = Fs/100;                   % 截止频率为 1/50 采样频率%
+%[b, d] = butter(4, Fc/(Fs/2), 'low');   % 4 阶
+%absorbance_spectrum_out  = filtfilt(b, d, absorbance_spectrum_out );   % filtfilt 避免相位延迟
+
+alpa(i,:)=absorbance_spectrum_out
+
+end
+
+alpm=mean(alpa,1)
+%alpm1=[alpm;absorbance_spectrum_out]
+
+
+addpath('E:\DJ\成员输入资料\李剑老师  发资料\吸收曲线_时域转频域cm-1')
+par0 = [0,0.004,0.05,0.05]; %【峰中心位置，峰高度 高斯部分FWHM 洛伦兹部分FWHM】
+ppar = lsqcurvefit(@vvoigtshape,par0,v_f,alpm),   
+fv1 = vvoigtshape(ppar,v_f);
+
+alpm1=[fv1;alpm]
+
+
+% 2. 吸收光谱的峰值 (标量/单个数字)
+%判断信号
+%if pp(4)>0.003&&P_light>0.1
+peak_absorbance_out= max(fv1);
+%end
+
+% 存储
+if ~isnan(peak_absorbance_out)
+    filename = 'G:\测试数据\20260807\遥测H2样机长期测试\NI00.txt';
+    fileID = fopen(filename, 'a');
+    if fileID ~= -1
+        timestamp = datestr(now, 'yyyy-mm-dd HH:MM:SS.FFF');
+        fprintf(fileID, '%s, %.0f%%, %.6f\r\n', timestamp, P_light,peak_absorbance_out);
+        fclose(fileID);
+    else
+        disp(['警告: 无法打开文件 ', filename, ' 进行写入。']);
+    end
+end
+
+
+
+
