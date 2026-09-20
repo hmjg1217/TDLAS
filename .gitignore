@@ -1,0 +1,34 @@
+# Generated build trees and IDE output
+build/
+build-*/
+release/
+.vs/
+*.user
+*.suo
+
+# Temporary LabVIEW/UI exports
+_lvtemp/
+_vi_png/
+
+# Compiled binaries and intermediate objects
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.ipch
+*.tlog
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.ninja
+build.ninja
+install_manifest.txt
+
