@@ -37,7 +37,8 @@ struct DaqmxConfig
     double outputAmplitude = 0.1;
     double outputOffset = 0.0;
     double sampleRate = 10000.0;
-    int samplesPerRead = 1000;
+    // Number of AI samples that form one displayed/acquired cycle.
+    int samplesPerCycle = 1000;
     double minimumValue = -10.0;
     double maximumValue = 10.0;
     double readTimeoutSeconds = 1.0;

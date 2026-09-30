@@ -48,14 +48,14 @@ CMake 将代码拆成四个目标：
 - 根据实际 NI-DAQmx 设备动态枚举 AI/AO 物理通道。
 - “输出通道”选择框。
 - “采集通道”选择框。
-- 采样率和每次读取样本数设置。
+- 采样率和单个周期内读取点数设置。
 - AI 电压量程上下限设置。
 - AO 输出波形选择：正弦波、方波、锯齿波、三角波。
 - AO 波形频率、峰值幅值和偏移量设置。
 - 开始/停止采集按钮。
 - 原始电压实时曲线。
 - 吸光度和 Voigt 拟合结果曲线。
-- 采集状态、本批样本数、最新电压、电压范围和算法结果监测。
+- 采集状态、本周期样本数、最新电压、电压范围和算法结果监测。
 
 点击开始时，界面参数会写入 `tdlas::DaqmxConfig`。选择有效输出通道后，采集线程创建 AO 任务并输出连续循环波形，同时创建 AI 任务采集输入通道。输出通道留空时支持 AI-only 模式。
 
@@ -70,7 +70,7 @@ CMake 将代码拆成四个目标：
 - `outputAmplitude`：峰值幅值，实际输出范围为 `offset - amplitude` 到 `offset + amplitude`。
 - `outputOffset`：直流偏移量，单位 V。
 - `sampleRate`：AI/AO 使用的采样率，单位 S/s。
-- `samplesPerRead`：AI 每批读取的样本数。
+- `samplesPerCycle`：AI 单个周期读取的样本数，同时决定原始曲线每次显示的点数。
 - `minimumValue` / `maximumValue`：AI 输入量程。
 
 `DaqmxAcquisition` 继承 `QThread`，通过以下信号向主线程发送结果：
@@ -116,7 +116,7 @@ AO 波形由采集线程内部生成一个完整周期的缓冲区，并用硬�
 - NI-DAQmx 头文件：`C:\Program Files\National Instruments\NI-DAQ\DAQmx ANSI C Dev\include`
 - NI-DAQmx MSVC 库：`C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib64\msvc\NIDAQmx.lib`
 
-已验证的增量构建命令：
+旧构建目录已在整理发布包时清理。重新开发前先运行下面的 CMake 配置命令，再使用已验证的构建命令：
 
 ```powershell
 & 'C:\Qt\Tools\CMake_64\bin\cmake.exe' --build build-msvc --config Debug --parallel 4
@@ -134,9 +134,11 @@ AO 波形由采集线程内部生成一个完整周期的缓冲区，并用硬�
   -DTDLAS_BUILD_TESTS=OFF
 ```
 
-Debug 可执行文件位置：
+重新构建后的 Debug 可执行文件位置：
 
 `build-msvc\Debug\tdlas_app.exe`
+
+当前可直接双击运行的发布包位于 `TDLAS_当前版本\tdlas_app.exe`，包含 Qt、MSVC 运行库及 NI-DAQmx 的 `nicaiu.dll`；真实采集仍要求系统安装 NI-DAQmx 驱动。
 
 运行时通常需要将以下目录加入 `PATH`：
 

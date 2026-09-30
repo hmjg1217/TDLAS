@@ -117,11 +117,11 @@ void MainWindow::buildUi()
     m_sampleRateSpin->setValue(10000.0);
     m_sampleRateSpin->setSuffix(QStringLiteral(" S/s"));
 
-    m_samplesPerReadSpin = new QSpinBox(configurationGroup);
-    m_samplesPerReadSpin->setRange(1, 1000000);
-    m_samplesPerReadSpin->setSingleStep(100);
-    m_samplesPerReadSpin->setValue(1000);
-    m_samplesPerReadSpin->setSuffix(QStringLiteral(" 点"));
+    m_samplesPerCycleSpin = new QSpinBox(configurationGroup);
+    m_samplesPerCycleSpin->setRange(1, 1000000);
+    m_samplesPerCycleSpin->setSingleStep(100);
+    m_samplesPerCycleSpin->setValue(1000);
+    m_samplesPerCycleSpin->setSuffix(QStringLiteral(" 点"));
 
     m_minimumValueSpin = new QDoubleSpinBox(configurationGroup);
     m_minimumValueSpin->setRange(-10.0, 10.0);
@@ -143,7 +143,7 @@ void MainWindow::buildUi()
     configurationLayout->addRow(QStringLiteral("波形偏移量"), m_outputOffsetSpin);
     configurationLayout->addRow(QStringLiteral("采集通道"), m_inputChannelCombo);
     configurationLayout->addRow(QStringLiteral("采样率"), m_sampleRateSpin);
-    configurationLayout->addRow(QStringLiteral("每次读取"), m_samplesPerReadSpin);
+    configurationLayout->addRow(QStringLiteral("单个周期内读取点数"), m_samplesPerCycleSpin);
     configurationLayout->addRow(QStringLiteral("量程下限"), m_minimumValueSpin);
     configurationLayout->addRow(QStringLiteral("量程上限"), m_maximumValueSpin);
 
@@ -165,7 +165,7 @@ void MainWindow::buildUi()
     m_peakValue = new QLabel(QStringLiteral("--"), monitorGroup);
     m_lightValue = new QLabel(QStringLiteral("--"), monitorGroup);
     monitorLayout->addRow(QStringLiteral("采集状态"), m_statusIndicator);
-    monitorLayout->addRow(QStringLiteral("本批样本"), m_sampleCountValue);
+    monitorLayout->addRow(QStringLiteral("本周期样本"), m_sampleCountValue);
     monitorLayout->addRow(QStringLiteral("最新电压"), m_latestValue);
     monitorLayout->addRow(QStringLiteral("电压范围"), m_rangeValue);
     monitorLayout->addRow(QStringLiteral("算法缓存"), m_algorithmValue);
@@ -374,13 +374,23 @@ void MainWindow::startAcquisition()
     config.outputAmplitude = m_outputAmplitudeSpin->value();
     config.outputOffset = m_outputOffsetSpin->value();
     config.sampleRate = m_sampleRateSpin->value();
-    config.samplesPerRead = m_samplesPerReadSpin->value();
+    config.samplesPerCycle = m_samplesPerCycleSpin->value();
     config.minimumValue = m_minimumValueSpin->value();
     config.maximumValue = m_maximumValueSpin->value();
 
     if (!m_acquisition->configure(config)) {
         return;
     }
+
+    // Keep the processing window aligned with the cycle size selected for
+    // acquisition.  With the processor's default 500-point cycle this is
+    // 100,000 points (10 cycles x 20 spectra), preserving the old behavior.
+    auto processorConfig = m_processor.config();
+    processorConfig.samplesPerCycle = config.samplesPerCycle;
+    processorConfig.windowSamples = processorConfig.samplesPerCycle
+        * processorConfig.averagedCyclesPerSpectrum
+        * processorConfig.averagedSpectra;
+    m_processor.setConfig(processorConfig);
 
     setAcquisitionUiState(true);
     setStatus(QStringLiteral("正在启动"), QStringLiteral("#b06a00"));
@@ -403,9 +413,11 @@ void MainWindow::stopAcquisition()
 void MainWindow::handleAcquisitionStarted()
 {
     m_processor.reset();
+    m_rawDisplayBuffer.clear();
     m_processedSeries->clear();
     m_fittedSeries->clear();
-    m_algorithmValue->setText(QStringLiteral("等待 100000 点"));
+    m_algorithmValue->setText(QStringLiteral("等待 %1 点")
+                                   .arg(m_processor.config().windowSamples));
     m_peakValue->setText(QStringLiteral("--"));
     m_lightValue->setText(QStringLiteral("--"));
     setAcquisitionUiState(true);
@@ -429,16 +441,6 @@ void MainWindow::handleSamples(const QVector<double> &samples, double sampleRate
         return;
     }
 
-    QVector<QPointF> points;
-    points.reserve(samples.size());
-    for (qsizetype index = 0; index < samples.size(); ++index) {
-        points.append(QPointF(static_cast<double>(index), samples.at(index)));
-    }
-    m_rawSeries->replace(points);
-
-    m_rawAxisX->setRange(0.0, std::max<qsizetype>(1, samples.size() - 1));
-    updateChartAxes(samples);
-
     tdlas::TDLASResult result;
     if (m_processor.appendSamples(samples, &result)) {
         updateProcessedChart(result);
@@ -447,19 +449,48 @@ void MainWindow::handleSamples(const QVector<double> &samples, double sampleRate
         m_lightValue->setText(QStringLiteral("%1 %").arg(result.lightPercent, 0, 'f', 2));
         statusBar()->showMessage(result.message);
     } else {
-        m_algorithmValue->setText(QStringLiteral("%1 / 100000 点")
-                                       .arg(m_processor.bufferedSampleCount()));
+        m_algorithmValue->setText(QStringLiteral("%1 / %2 点")
+                                       .arg(m_processor.bufferedSampleCount())
+                                       .arg(m_processor.config().windowSamples));
     }
 
-    const auto range = std::minmax_element(samples.cbegin(), samples.cend());
-    m_sampleCountValue->setText(QString::number(samples.size()));
-    m_latestValue->setText(QStringLiteral("%1 V").arg(samples.constLast(), 0, 'f', 6));
+    // DAQmx may deliver a partial batch, so buffer incoming samples until a
+    // complete user-configured cycle is available.  The raw chart always
+    // represents exactly one cycle, independent of the driver read chunk.
+    m_rawDisplayBuffer += samples;
+    const int cycleSamples = m_samplesPerCycleSpin->value();
+    if (cycleSamples <= 0 || m_rawDisplayBuffer.size() < cycleSamples) {
+        statusBar()->showMessage(
+            QStringLiteral("等待单周期数据：%1 / %2 点，%3 S/s")
+                .arg(m_rawDisplayBuffer.size())
+                .arg(cycleSamples)
+                .arg(sampleRate, 0, 'f', 0));
+        return;
+    }
+
+    const int completeSamples = (m_rawDisplayBuffer.size() / cycleSamples) * cycleSamples;
+    const QVector<double> cycle = m_rawDisplayBuffer.mid(
+        completeSamples - cycleSamples, cycleSamples);
+    m_rawDisplayBuffer.remove(0, completeSamples);
+
+    QVector<QPointF> points;
+    points.reserve(cycle.size());
+    for (qsizetype index = 0; index < cycle.size(); ++index) {
+        points.append(QPointF(static_cast<double>(index), cycle.at(index)));
+    }
+    m_rawSeries->replace(points);
+    m_rawAxisX->setRange(0.0, std::max(1, cycleSamples - 1));
+    updateChartAxes(cycle);
+
+    const auto range = std::minmax_element(cycle.cbegin(), cycle.cend());
+    m_sampleCountValue->setText(QString::number(cycle.size()));
+    m_latestValue->setText(QStringLiteral("%1 V").arg(cycle.constLast(), 0, 'f', 6));
     m_rangeValue->setText(
         QStringLiteral("%1 ～ %2 V")
             .arg(*range.first, 0, 'f', 6)
             .arg(*range.second, 0, 'f', 6));
-    statusBar()->showMessage(QStringLiteral("实时更新：%1 点，%2 S/s")
-                                 .arg(samples.size())
+    statusBar()->showMessage(QStringLiteral("实时更新：单周期 %1 点，%2 S/s")
+                                 .arg(cycle.size())
                                  .arg(sampleRate, 0, 'f', 0));
 }
 
@@ -526,7 +557,7 @@ void MainWindow::setAcquisitionUiState(bool running)
     m_outputAmplitudeSpin->setEnabled(!running);
     m_outputOffsetSpin->setEnabled(!running);
     m_sampleRateSpin->setEnabled(!running);
-    m_samplesPerReadSpin->setEnabled(!running);
+    m_samplesPerCycleSpin->setEnabled(!running);
     m_minimumValueSpin->setEnabled(!running);
     m_maximumValueSpin->setEnabled(!running);
     m_startButton->setEnabled(!running);

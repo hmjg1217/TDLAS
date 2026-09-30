@@ -61,7 +61,7 @@ private:
     QDoubleSpinBox *m_outputAmplitudeSpin = nullptr;
     QDoubleSpinBox *m_outputOffsetSpin = nullptr;
     QDoubleSpinBox *m_sampleRateSpin = nullptr;
-    QSpinBox *m_samplesPerReadSpin = nullptr;
+    QSpinBox *m_samplesPerCycleSpin = nullptr;
     QDoubleSpinBox *m_minimumValueSpin = nullptr;
     QDoubleSpinBox *m_maximumValueSpin = nullptr;
     QPushButton *m_startButton = nullptr;
@@ -82,4 +82,5 @@ private:
     QValueAxis *m_rawAxisY = nullptr;
     QValueAxis *m_processedAxisX = nullptr;
     QValueAxis *m_processedAxisY = nullptr;
+    QVector<double> m_rawDisplayBuffer;
 };

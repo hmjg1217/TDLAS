@@ -104,9 +104,9 @@ bool DaqmxAcquisition::validateConfig(const DaqmxConfig &config,
         }
         return false;
     }
-    if (config.sampleRate <= 0.0 || config.samplesPerRead <= 0) {
+    if (config.sampleRate <= 0.0 || config.samplesPerCycle <= 0) {
         if (errorMessage != nullptr) {
-            *errorMessage = QStringLiteral("采样率和每次读取样本数必须大于 0。");
+            *errorMessage = QStringLiteral("采样率和单个周期读取点数必须大于 0。");
         }
         return false;
     }
@@ -281,7 +281,7 @@ void DaqmxAcquisition::run()
     TaskHandle aiTaskHandle = nullptr;
     TaskHandle aoTaskHandle = nullptr;
     char errorBuffer[2048] = {};
-    QVector<double> samples(activeConfig.samplesPerRead);
+    QVector<double> samples(activeConfig.samplesPerCycle);
 
     auto checkError = [&](int32 code, const char *operation) {
         if (code >= 0) {
@@ -375,7 +375,7 @@ void DaqmxAcquisition::run()
             activeConfig.sampleRate,
             DAQmx_Val_Rising,
             DAQmx_Val_ContSamps,
-            static_cast<uInt64>(activeConfig.samplesPerRead));
+            static_cast<uInt64>(activeConfig.samplesPerCycle));
         checkError(errorCode, "DAQmxCfgSampClkTiming");
     }
 
@@ -398,7 +398,7 @@ void DaqmxAcquisition::run()
             int32 samplesRead = 0;
             errorCode = DAQmxReadAnalogF64(
                 aiTaskHandle,
-                activeConfig.samplesPerRead,
+                activeConfig.samplesPerCycle,
                 activeConfig.readTimeoutSeconds,
                 DAQmx_Val_GroupByChannel,
                 samples.data(),

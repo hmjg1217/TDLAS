@@ -19,6 +19,7 @@ TDLAS测氢/
 ├─ resources/                  # Qt 资源、图标、样式表
 ├─ tests/                      # 单元测试和硬件无关测试
 ├─ cmake/                      # 后续放置 CMake 辅助模块
+├─ TDLAS_当前版本/             # 当前可直接运行的 Release 包及依赖
 └─ 吸收曲线_时域转频域cm-1/   # 已有 MATLAB、LVM、CSV 资料，保持为数据/参考目录
 ```
 
@@ -47,4 +48,4 @@ cmake -S . -B build `
   -DDAQMX_LIBRARY="C:/path/to/nidaqmx.lib"
 ```
 
-实际通道名、采样率、触发方式和每次读取样本数不在 CMake 中固定，后续会由 UI 配置传入采集模块。
+实际通道名、采样率、触发方式和单个周期内读取点数不在 CMake 中固定，后续会由 UI 配置传入采集模块。
