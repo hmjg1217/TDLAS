@@ -32,6 +32,7 @@ protected:
 private slots:
     void refreshDaqDevices();
     void handleDeviceSelectionChanged(int index);
+    void saveAcquisitionSettings();
     void startAcquisition();
     void stopAcquisition();
     void handleAcquisitionStarted();
@@ -42,11 +43,17 @@ private slots:
 private:
     void buildUi();
     void connectSignals();
+    void loadAcquisitionSettings();
     void populateChannelsForDevice(int index);
     void setAcquisitionUiState(bool running);
     void setStatus(const QString &text, const QString &color);
     void updateChartAxes(const QVector<double> &samples);
-    void updateProcessedChart(const tdlas::TDLASResult &result);
+    void updateProcessedChart(const tdlas::TDLASResult &result,
+                              double sampleRate,
+                              int displayOffsetSamples,
+                              int displayWindowSamples);
+    void updateFv1Chart(const tdlas::TDLASResult &result);
+    void updateTimeAxes(double cycleDurationSeconds);
 
     tdlas::DaqmxAcquisition *m_acquisition = nullptr;
     tdlas::TDLASProcessor m_processor;
@@ -57,6 +64,7 @@ private:
     QComboBox *m_inputChannelCombo = nullptr;
     QComboBox *m_waveformCombo = nullptr;
     QPushButton *m_refreshDevicesButton = nullptr;
+    QPushButton *m_saveSettingsButton = nullptr;
     QDoubleSpinBox *m_outputFrequencySpin = nullptr;
     QDoubleSpinBox *m_outputAmplitudeSpin = nullptr;
     QDoubleSpinBox *m_outputOffsetSpin = nullptr;
@@ -75,12 +83,19 @@ private:
     QLabel *m_lightValue = nullptr;
     QChartView *m_rawChartView = nullptr;
     QChartView *m_processedChartView = nullptr;
+    QChartView *m_fv1ChartView = nullptr;
     QLineSeries *m_rawSeries = nullptr;
     QLineSeries *m_processedSeries = nullptr;
     QLineSeries *m_fittedSeries = nullptr;
+    QLineSeries *m_fv1Series = nullptr;
     QValueAxis *m_rawAxisX = nullptr;
     QValueAxis *m_rawAxisY = nullptr;
     QValueAxis *m_processedAxisX = nullptr;
     QValueAxis *m_processedAxisY = nullptr;
+    QValueAxis *m_fv1AxisX = nullptr;
+    QValueAxis *m_fv1AxisY = nullptr;
     QVector<double> m_rawDisplayBuffer;
+    double m_displaySampleRate = 0.0;
+    bool m_sawtoothCycleDetectionEnabled = false;
+    int m_detectedCycleSamples = 0;
 };

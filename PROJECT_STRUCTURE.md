@@ -19,7 +19,7 @@ TDLAS测氢/
 ├─ resources/                  # Qt 资源、图标、样式表
 ├─ tests/                      # 单元测试和硬件无关测试
 ├─ cmake/                      # 后续放置 CMake 辅助模块
-├─ TDLAS_当前版本/             # 当前可直接运行的 Release 包及依赖
+├─ TDLAS_v1.4/                 # v1.4 可直接运行的 Release 包及依赖
 └─ 吸收曲线_时域转频域cm-1/   # 已有 MATLAB、LVM、CSV 资料，保持为数据/参考目录
 ```
 

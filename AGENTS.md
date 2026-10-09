@@ -138,7 +138,7 @@ AO 波形由采集线程内部生成一个完整周期的缓冲区，并用硬�
 
 `build-msvc\Debug\tdlas_app.exe`
 
-当前可直接双击运行的发布包位于 `TDLAS_当前版本\tdlas_app.exe`，包含 Qt、MSVC 运行库及 NI-DAQmx 的 `nicaiu.dll`；真实采集仍要求系统安装 NI-DAQmx 驱动。
+当前可直接双击运行的 v1.4 发布包位于 `TDLAS_v1.4\tdlas_app.exe`，包含 Qt、MSVC 运行库及 NI-DAQmx 的 `nicaiu.dll`；真实采集仍要求系统安装 NI-DAQmx 驱动。
 
 运行时通常需要将以下目录加入 `PATH`：
 

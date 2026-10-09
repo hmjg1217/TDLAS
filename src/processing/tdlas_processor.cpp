@@ -203,6 +203,13 @@ TDLASResult TDLASProcessor::processWindow(const QVector<double> &window) const
     applyZeroPhaseLowPass(&filtered);
     QVector<double> accumulatedAbsorbance;
     QVector<double> accumulatedFrequency;
+    QVector<double> accumulatedVoltage;
+    QVector<double> accumulatedBaseline;
+
+    const int processedBegin = std::max(0, static_cast<int>(std::floor(0.3 * samplesPerCycle)) - 1);
+    const int processedEnd = std::min(samplesPerCycle, static_cast<int>(std::floor(0.9 * samplesPerCycle)));
+    result.sampleOffset = processedBegin;
+    result.cycleSamples = samplesPerCycle;
 
     for (int spectrumIndex = 0; spectrumIndex < spectra; ++spectrumIndex) {
         QVector<double> cycleAverage(samplesPerCycle, 0.0);
@@ -220,8 +227,8 @@ TDLASResult TDLASProcessor::processWindow(const QVector<double> &window) const
         QVector<double> aligned(samplesPerCycle);
         for (int sample = 0; sample < samplesPerCycle; ++sample) aligned[sample] = doubled.at(peakIndex + sample) + 4.2;
 
-        const int begin = std::max(0, static_cast<int>(std::floor(0.3 * samplesPerCycle)) - 1);
-        const int end = std::min(samplesPerCycle, static_cast<int>(std::floor(0.9 * samplesPerCycle)));
+        const int begin = processedBegin;
+        const int end = processedEnd;
         QVector<double> y;
         for (int sample = begin; sample <= end; ++sample) y.append(aligned.at(sample));
         QVector<double> x(y.size());
@@ -237,8 +244,10 @@ TDLASResult TDLASProcessor::processWindow(const QVector<double> &window) const
         const QVector<double> polynomial = polynomialFit4(baselineX, baselineY);
         if (polynomial.size() != 5) { result.message = QStringLiteral("Baseline fit failed."); return result; }
         QVector<double> absorbance(y.size());
+        QVector<double> baselineValues(y.size());
         for (qsizetype index = 0; index < y.size(); ++index) {
             const double baseline = evaluatePolynomial(polynomial, x.at(index));
+            baselineValues[index] = baseline;
             absorbance[index] = std::log(std::max(baseline, 1e-12) / std::max(y.at(index), 1e-12));
         }
 
@@ -254,18 +263,34 @@ TDLASResult TDLASProcessor::processWindow(const QVector<double> &window) const
         if (spectrumIndex == 0) {
             accumulatedAbsorbance = absorbance;
             accumulatedFrequency = frequency;
+            accumulatedVoltage = y;
+            accumulatedBaseline = baselineValues;
             result.lightPercent = (aligned.constLast() - aligned.at(49)) / 2.0 * 100.0;
         } else {
-            for (qsizetype index = 0; index < absorbance.size(); ++index) accumulatedAbsorbance[index] += absorbance.at(index);
+            for (qsizetype index = 0; index < absorbance.size(); ++index) {
+                accumulatedAbsorbance[index] += absorbance.at(index);
+                accumulatedVoltage[index] += y.at(index);
+                accumulatedBaseline[index] += baselineValues.at(index);
+            }
         }
     }
 
-    for (double &value : accumulatedAbsorbance) value /= static_cast<double>(spectra);
+    for (qsizetype index = 0; index < accumulatedAbsorbance.size(); ++index) {
+        accumulatedAbsorbance[index] /= static_cast<double>(spectra);
+        accumulatedVoltage[index] /= static_cast<double>(spectra);
+        accumulatedBaseline[index] /= static_cast<double>(spectra);
+    }
     const std::array<double, 4> fitParameters = fitVoigt(accumulatedFrequency, accumulatedAbsorbance);
     result.frequencyCm1 = accumulatedFrequency;
     result.absorbance = accumulatedAbsorbance;
+    result.voltage = accumulatedVoltage;
     result.fittedAbsorbance.resize(accumulatedFrequency.size());
+    result.fittedVoltage.resize(accumulatedFrequency.size());
     for (qsizetype index = 0; index < accumulatedFrequency.size(); ++index) result.fittedAbsorbance[index] = voigtShape(fitParameters, accumulatedFrequency.at(index));
+    for (qsizetype index = 0; index < accumulatedFrequency.size(); ++index) {
+        result.fittedVoltage[index] = accumulatedBaseline.at(index)
+            * std::exp(-result.fittedAbsorbance.at(index));
+    }
     result.peakAbsorbance = *std::max_element(result.fittedAbsorbance.cbegin(), result.fittedAbsorbance.cend());
     result.valid = true;
     result.message = QStringLiteral("TDLAS complete: peak absorbance = %1").arg(result.peakAbsorbance, 0, 'f', 6);
