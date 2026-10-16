@@ -16,21 +16,17 @@
 
 ## 当前工程结构
 
+当前唯一保留的工程位于 `TDLAS_v1.5/`；仓库根目录中的 v1.4 源码、构建目录和重复发布资料已清理。以下工程路径和构建命令均以 `TDLAS_v1.5/` 为工作目录。
+
 ```text
 TDLAS 测氢/
-├─ CMakeLists.txt              # CMake 配置、Qt/NI-DAQmx 依赖和目标定义
-├─ app/main.cpp                # QApplication 和 MainWindow 入口
-├─ include/core/               # 通用数据模型
-├─ include/daq/                # DAQmx 接口和采集配置
-├─ include/processing/          # TDLAS 算法接口和结果结构
-├─ include/ui/                 # 主窗口声明
-├─ src/core/                   # 通用数据模型实现
-├─ src/daq/                    # NI-DAQmx 任务和采集线程实现
-├─ src/processing/             # TDLAS 数据处理实现
-├─ src/ui/                    # Qt 主界面和图表实现
-├─ 吸收曲线_时域转频域cm-1/     # MATLAB、LVM、CSV 和 Voigt 参考资料
-├─ 测氢算法.txt                # 用户提供的算法参考资料
-└─ AGENTS.md                  # 本项目上下文和协作约定
+└─ TDLAS_v1.5/
+   ├─ CMakeLists.txt           # CMake 配置、Qt/NI-DAQmx 依赖和目标定义
+   ├─ app/、include/、src/     # 程序源码
+   ├─ tests/                   # 硬件无关测试
+   ├─ 吸收曲线_时域转频域cm-1/  # MATLAB、LVM、CSV 和 Voigt 参考资料
+   └─ 测氢算法.txt             # 用户提供的算法参考资料
+AGENTS.md                     # 本项目上下文和协作约定
 ```
 
 CMake 将代码拆成四个目标：
@@ -108,12 +104,12 @@ AO 波形由采集线程内部生成一个完整周期的缓冲区，并用硬�
 
 ## 构建环境
 
-已验证的构建环境：
+已验证的构建环境（命令在 `TDLAS_v1.5` 目录执行）：
 
 - Visual Studio 17 2022 x64
 - Qt 6.11.2，路径：`C:\Qt\6.11.2\msvc2022_64`
 - CMake：`C:\Qt\Tools\CMake_64\bin\cmake.exe`
-- NI-DAQmx 头文件：`C:\Program Files\National Instruments\NI-DAQ\DAQmx ANSI C Dev\include`
+- NI-DAQmx 头文件：`C:\Program Files (x86)\National Instruments\NI-DAQ\DAQmx ANSI C Dev\include`
 - NI-DAQmx MSVC 库：`C:\Program Files (x86)\National Instruments\Shared\ExternalCompilerSupport\C\lib64\msvc\NIDAQmx.lib`
 
 旧构建目录已在整理发布包时清理。重新开发前先运行下面的 CMake 配置命令，再使用已验证的构建命令：
@@ -129,16 +125,16 @@ AO 波形由采集线程内部生成一个完整周期的缓冲区，并用硬�
   -S . -B build-msvc `
   -DCMAKE_PREFIX_PATH='C:/Qt/6.11.2/msvc2022_64' `
   -DTDLAS_ENABLE_DAQMX=ON `
-  -DDAQMX_INCLUDE_DIR='C:/Program Files/National Instruments/NI-DAQ/DAQmx ANSI C Dev/include' `
+  -DDAQMX_INCLUDE_DIR='C:/Program Files (x86)/National Instruments/NI-DAQ/DAQmx ANSI C Dev/include' `
   -DDAQMX_LIBRARY='C:/Program Files (x86)/National Instruments/Shared/ExternalCompilerSupport/C/lib64/msvc/NIDAQmx.lib' `
   -DTDLAS_BUILD_TESTS=OFF
 ```
 
 重新构建后的 Debug 可执行文件位置：
 
-`build-msvc\Debug\tdlas_app.exe`
+`TDLAS_v1.5\build-msvc\Debug\tdlas_app.exe`
 
-当前可直接双击运行的 v1.4 发布包位于 `TDLAS_v1.4\tdlas_app.exe`，包含 Qt、MSVC 运行库及 NI-DAQmx 的 `nicaiu.dll`；真实采集仍要求系统安装 NI-DAQmx 驱动。
+当前可直接双击运行的 v1.5 发布包位于 `TDLAS_v1.5\TDLAS_v1.5发布包\`，包含 Qt、MSVC 运行库及 NI-DAQmx 的 `nicaiu.dll`；真实采集仍要求系统安装 NI-DAQmx 驱动。
 
 运行时通常需要将以下目录加入 `PATH`：
 

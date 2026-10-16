@@ -32,3 +32,6 @@ Makefile
 build.ninja
 install_manifest.txt
 
+# Keep the v1.5 distribution ZIP, not its duplicate extracted copy
+/TDLAS_v1.5/TDLAS_v1.5发布包/TDLAS_v1.5发布包_测试版/
+
